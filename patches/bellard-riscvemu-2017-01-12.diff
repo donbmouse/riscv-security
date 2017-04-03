@@ -1,0 +1,62 @@
+diff -Naur a/build_filelist.c b/build_filelist.c
+--- a/build_filelist.c	2017-01-12 13:29:09.000000000 -0700
++++ b/build_filelist.c	2017-03-30 13:46:33.773844000 -0600
+@@ -58,7 +58,7 @@
+             goto use_quote;
+         s++;
+     }
+-    fprintf(f, str);
++    fprintf(f, "%s", str);
+     return;
+  use_quote:
+     s = str;
+diff -Naur a/riscvemu.c b/riscvemu.c
+--- a/riscvemu.c	2017-01-12 13:29:09.000000000 -0700
++++ b/riscvemu.c	2017-03-30 13:46:13.287606000 -0600
+@@ -2393,16 +2393,18 @@
+                          uint64_t sector_num, uint8_t *buf, int n,
+                          BlockDeviceCompletionFunc *cb, void *opaque)
+ {
++	size_t xxx;
+     BlockDeviceFile *bf = bs->opaque;
+     //    printf("bf_read_async: sector_num=%" PRId64 " n=%d\n", sector_num, n);
+     if (!bf->f)
+         return -1;
++    xxx = 0;
+     if (bf->mode == BF_MODE_SNAPSHOT) {
+         int i;
+         for(i = 0; i < n; i++) {
+             if (!bf->sector_table[sector_num]) {
+                 fseek(bf->f, sector_num * SECTOR_SIZE, SEEK_SET);
+-                fread(buf, 1, SECTOR_SIZE, bf->f);
++                xxx = fread(buf, 1, SECTOR_SIZE, bf->f);
+             } else {
+                 memcpy(buf, bf->sector_table[sector_num], SECTOR_SIZE);
+             }
+@@ -2411,8 +2413,13 @@
+         }
+     } else {
+         fseek(bf->f, sector_num * SECTOR_SIZE, SEEK_SET);
+-        fread(buf, 1, n * SECTOR_SIZE, bf->f);
++        xxx = fread(buf, 1, n * SECTOR_SIZE, bf->f);
+     }
++	if((ssize_t)xxx <= 0)
++	{
++		fprintf(stderr, "donb: xxx <= 0 (fread)\n");
++		return -1;
++	}
+     /* synchronous read */
+     return 0;
+ }
+@@ -2609,7 +2616,10 @@
+                              const uint8_t *buf, int len)
+ {
+     int fd = (intptr_t)(bs->opaque);
+-    write(fd, buf, len);
++    ssize_t x;
++    x = write(fd, buf, len);
++    if(x != len)
++	fprintf(stderr, "warning: donb: tun_write_packet failed");
+ }
+ 
+ /* configure with:
